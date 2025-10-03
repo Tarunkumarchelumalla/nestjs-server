@@ -109,7 +109,7 @@ export class ImageService {
     const response = await axios.post(
       'https://n8n.cinqa.space/webhook/7cfd8f0f-2d73-4ca8-8c1d-99cb4812b46b',
       newPayload,
-      { headers: { 'Content-Type': 'application/json' }, timeout: 60000 },
+      { headers: { 'Content-Type': 'application/json' } },
     );
 
     return { status: 'success', response: response.data };
