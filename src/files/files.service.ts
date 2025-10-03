@@ -14,6 +14,8 @@ export class FileService {
       process.env.SUPABASE_KEY || "",
     );
 
+    console.log({gg:process.env.CLOUDINARY_CLOUD_NAME})
+
     // Cloudinary setup
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -24,7 +26,6 @@ export class FileService {
 
   async uploadToCloudinaryFromUrl(imageUrl: string, folder = 'supabase_uploads') {
     if (!imageUrl) throw new BadRequestException('No image URL provided');
-
     // Skip if already hosted
     if (imageUrl.includes(`res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}`)) {
       return { status: 'skipped', url: imageUrl };

@@ -79,6 +79,7 @@ export class ImageService {
   }
 
   async adkrityTextHeavy(inputPayload: any) {
+    console.log({inputPayload})
     async function urlToBase64(url: string, mime: string) {
       const response = await fetch(url);
       const buffer = await response.arrayBuffer();
