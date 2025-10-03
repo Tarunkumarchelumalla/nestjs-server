@@ -8,8 +8,7 @@ export class FileService {
   private supabase;
 
   constructor() {
-    // Supabase setup
-    console.log({SUPABASE_URL:process.env.SUPABASE_URL,SUPABASE_KEY:process.env.SUPABASE_KEY})
+
     this.supabase = createClient(
       process.env.SUPABASE_URL|| "",
       process.env.SUPABASE_KEY || "",
