@@ -112,6 +112,6 @@ export class ImageService {
       { headers: { 'Content-Type': 'application/json' }, timeout: 60000 },
     );
 
-    return { status: 'success', forwardedPayload: newPayload, response: response.data };
+    return { status: 'success', response: response.data };
   }
 }
