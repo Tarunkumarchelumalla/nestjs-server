@@ -35,4 +35,6 @@ fi
 # 5. Save PM2 process list for startup
 pm2 save
 
+pm2 logs $APP_NAME
+
 echo "✅ Deployment complete. Application running as '$APP_NAME'"
