@@ -132,7 +132,7 @@ export class ImageService {
         if (publicId) {
           console.log("Resizing:", uploadedUrl);
 
-          const resizedUrl = `https://res.cloudinary.com/dknssnkrd/image/upload/h_1024,w_1024/${publicId}`;
+          const resizedUrl = `https://res.cloudinary.com/dknssnkrd/image/upload/c_pad,ar_1:1/${publicId}`;
           return await urlToBase64(resizedUrl, mime);
         }
       }
