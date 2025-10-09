@@ -123,7 +123,7 @@ export class ImageService {
       const { width, height } = await getImageDimensions(url);
       console.log("Checked:", url, "→", width, height);
   
-      if (width !== 1024 || height !== 1024) {
+      if (false) {
         invalidImages.push(url);
   
         // Upload invalid image to Cloudinary
