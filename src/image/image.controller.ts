@@ -22,7 +22,7 @@ export class ImageController {
 
   @Post('add-noise')
   async addNoise(@Body('base64') base64: string) {
-    const noisyBase64 = await this.imageService.addNoise(base64, 1);
-    return { noisyBase64 };
+    const reponse = await this.imageService.addNoise(base64, 1);
+    return {...reponse  };
   }
 }
