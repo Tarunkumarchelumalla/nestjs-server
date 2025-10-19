@@ -216,7 +216,7 @@ export class ImageService {
   }
 
   
-async addNoise(base64: string, intensity = 1): Promise<string> {
+async addNoise(base64: string, intensity = 1): Promise<any> {
     try {
       // Validate and parse input
       const mimeMatch = base64.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,/);
@@ -247,7 +247,8 @@ async addNoise(base64: string, intensity = 1): Promise<string> {
 
       // Return new Base64
       const newBase64 = canvas.toDataURL();
-      return newBase64;
+      const cleanBase64 = newBase64.replace(/^data:image\/\w+;base64,/, '');
+      return {cleanBase64,mime:'image/png'};
     } catch (err) {
       console.error('Error adding noise:', err);
       throw err;
