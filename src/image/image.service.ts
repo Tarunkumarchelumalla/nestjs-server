@@ -4,6 +4,7 @@ import FormData from 'form-data';
 import imageSize from "image-size";
 import { v2 as cloudinary } from 'cloudinary';
 import { FileService } from 'src/files/files.service';
+import { createCanvas, loadImage } from 'canvas';
 
 @Injectable()
 export class ImageService {
@@ -213,5 +214,44 @@ export class ImageService {
         return 'application/octet-stream';
     }
   }
+
   
+async addNoise(base64: string, intensity = 1): Promise<string> {
+    try {
+      // Validate and parse input
+      const mimeMatch = base64.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,/);
+      if (!mimeMatch) throw new Error('Invalid Base64 image format');
+
+      const mime = mimeMatch[1];
+      const data = base64.split(',')[1];
+      const buffer = Buffer.from(data, 'base64');
+
+      // Load image into canvas
+      const img = await loadImage(buffer);
+      const canvas = createCanvas(img.width, img.height);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+
+      // Extract pixel data
+      const imageData = ctx.getImageData(0, 0, img.width, img.height);
+      const pixels = imageData.data;
+
+      // Add subtle noise (±intensity)
+      for (let i = 0; i < pixels.length; i += 4) {
+        pixels[i] = Math.min(255, Math.max(0, pixels[i] + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity)));     // R
+        pixels[i + 1] = Math.min(255, Math.max(0, pixels[i + 1] + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity))); // G
+        pixels[i + 2] = Math.min(255, Math.max(0, pixels[i + 2] + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity))); // B
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+
+      // Return new Base64
+      const newBase64 = canvas.toDataURL();
+      return newBase64;
+    } catch (err) {
+      console.error('Error adding noise:', err);
+      throw err;
+    }
+  }
+
 }

@@ -19,4 +19,10 @@ export class ImageController {
   async adkrityTextHeavy(@Body() body: any) {
     return this.imageService.adkrityTextHeavy(body);
   }
+
+  @Post('add-noise')
+  async addNoise(@Body('base64') base64: string) {
+    const noisyBase64 = await this.imageService.addNoise(base64, 1);
+    return { noisyBase64 };
+  }
 }
