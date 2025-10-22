@@ -216,12 +216,15 @@ export class ImageService {
   }
 
   
-async addNoise(base64: string, intensity = 1): Promise<any> {
+ async addNoise(base64: string, intensity = 1): Promise<any> {
     try {
+
+      
       // Validate and parse input
       const mimeMatch = base64.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,/);
       if (!mimeMatch) throw new Error('Invalid Base64 image format');
-
+      console.log({mime:mimeMatch[1]});
+      
       const mime = mimeMatch[1];
       const data = base64.split(',')[1];
       const buffer = Buffer.from(data, 'base64');
