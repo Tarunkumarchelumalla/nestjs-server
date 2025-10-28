@@ -5,6 +5,10 @@ import imageSize from "image-size";
 import { v2 as cloudinary } from 'cloudinary';
 import { FileService } from 'src/files/files.service';
 import { createCanvas, loadImage } from 'canvas';
+import fetch from 'node-fetch';
+import * as fs from 'fs';
+import { GoogleGenAI } from '@google/genai';
+import path from 'path';
 
 @Injectable()
 export class ImageService {
@@ -16,7 +20,12 @@ export class ImageService {
       api_key: process.env.CLOUDINARY_API_KEY,
       api_secret: process.env.CLOUDINARY_API_SECRET,
     });
+    
+    this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
+  private readonly ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  
+ 
 
   parseBase64(b64: string, defaultMime = 'image/png') {
     let mimeType = defaultMime;
@@ -217,44 +226,104 @@ export class ImageService {
 
   
  async addNoise(base64: string, intensity = 1): Promise<any> {
-    try {
+  try {
 
       
-      // Validate and parse input
-      const mimeMatch = base64.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,/);
-      if (!mimeMatch) throw new Error('Invalid Base64 image format');
+    // Validate and parse input
+    const mimeMatch = base64.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,/);
+    if (!mimeMatch) throw new Error('Invalid Base64 image format');
       console.log({mime:mimeMatch[1]});
       
-      const mime = mimeMatch[1];
-      const data = base64.split(',')[1];
-      const buffer = Buffer.from(data, 'base64');
+    const mime = mimeMatch[1];
+    const data = base64.split(',')[1];
+    const buffer = Buffer.from(data, 'base64');
 
-      // Load image into canvas
-      const img = await loadImage(buffer);
-      const canvas = createCanvas(img.width, img.height);
-      const ctx = canvas.getContext('2d');
+    // Load image into canvas
+    const img = await loadImage(buffer);
+    const canvas = createCanvas(img.width, img.height);
+    const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0);
 
-      // Extract pixel data
-      const imageData = ctx.getImageData(0, 0, img.width, img.height);
-      const pixels = imageData.data;
+    // Extract pixel data
+    const imageData = ctx.getImageData(0, 0, img.width, img.height);
+    const pixels = imageData.data;
 
       // Add subtle noise (±intensity)
-      for (let i = 0; i < pixels.length; i += 4) {
-        pixels[i] = Math.min(255, Math.max(0, pixels[i] + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity)));     // R
-        pixels[i + 1] = Math.min(255, Math.max(0, pixels[i + 1] + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity))); // G
-        pixels[i + 2] = Math.min(255, Math.max(0, pixels[i + 2] + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity))); // B
-      }
+    for (let i = 0; i < pixels.length; i += 4) {
+      pixels[i] = Math.min(255, Math.max(0, pixels[i] + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity)));     // R
+      pixels[i + 1] = Math.min(255, Math.max(0, pixels[i + 1] + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity))); // G
+      pixels[i + 2] = Math.min(255, Math.max(0, pixels[i + 2] + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity))); // B
+    }
 
-      ctx.putImageData(imageData, 0, 0);
+    ctx.putImageData(imageData, 0, 0);
 
       // Return new Base64
       const newBase64 = canvas.toDataURL();
-      const cleanBase64 = newBase64.replace(/^data:image\/\w+;base64,/, '');
+    const cleanBase64 = newBase64.replace(/^data:image\/\w+;base64,/, '');
       return {cleanBase64,mime:'image/png'};
-    } catch (err) {
-      console.error('Error adding noise:', err);
-      throw err;
+  } catch (err) {
+    console.error('Error adding noise:', err);
+    throw err;
+  }
+}
+
+ async generateVideo(imageBytes: string, videoprompt: string): Promise<any> {
+    try {
+      console.log('🎬 Starting Veo 3.1 video generation...');
+
+      // Step 1: Start video generation
+      let operation = await this.ai.models.generateVideos({
+        model: 'veo-3.1-generate-preview',
+        prompt: videoprompt,
+        image: {
+          imageBytes,
+          mimeType: 'image/png',
+        },
+      });
+
+      // Step 2: Poll until done
+      while (!operation.done) {
+        console.log('⏳ Waiting for video generation to complete...');
+        await new Promise((resolve) => setTimeout(resolve, 10000));
+
+        operation = await this.ai.operations.getVideosOperation({ operation });
+      }
+
+      console.log('✅ Video generation complete! Downloading...');
+
+      // Step 3: Extract and validate video file
+      const videoFile = operation.response?.generatedVideos?.[0]?.video;
+      if (!videoFile) throw new Error('No video file found in operation response.');
+
+      // Step 4: Ensure uploads directory exists
+      const uploadsDir = path.resolve('uploads/videos');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      // Step 5: Save video locally
+      const fileName = `veo_video_${Date.now()}.mp4`;
+      const downloadPath = path.join(uploadsDir, fileName);
+      await this.ai.files.download({
+        file: videoFile,
+        downloadPath,
+      });
+
+      console.log(`🎥 Video saved at: ${downloadPath}`);
+
+      // Step 6: Return public URL
+      const baseUrl = process.env.SERVER_URL || 'http://localhost:3000';
+      const publicUrl = `${baseUrl}/uploads/videos/${fileName}`;
+
+      return {
+        success: true,
+        message: 'Video generated successfully',
+        fileName,
+        url: publicUrl,
+      };
+    } catch (error) {
+      console.error('❌ Error generating video:', error.message || error);
+      throw error;
     }
   }
 
