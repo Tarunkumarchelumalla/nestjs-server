@@ -271,14 +271,18 @@ export class ImageService {
     try {
       console.log('🎬 Starting Veo 3.1 video generation...');
 
+      const videoObject =
+        imageBytes ? {
+          imageBytes,
+          mimeType: 'image/png',
+        } : {};
+      
+
       // Step 1: Start video generation
       let operation = await this.ai.models.generateVideos({
         model: 'veo-3.1-generate-preview',
         prompt: videoprompt,
-        image: {
-          imageBytes,
-          mimeType: 'image/png',
-        },
+        ...videoObject,
       });
 
       // Step 2: Poll until done
