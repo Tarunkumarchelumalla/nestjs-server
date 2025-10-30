@@ -38,6 +38,11 @@ export class ImageController {
     }
   }
 
+    @Post('adkrity-text-heavy')
+  async adkrityTextHeavy(@Body() body: any) {
+    return this.imageService.adkrityTextHeavy(body);
+  }
+
   @Post('generate-video')
   async generateVideo(@Body() body: any) {
     try{
