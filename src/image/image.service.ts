@@ -178,6 +178,7 @@ export class ImageService {
 
     const response = await axios.post(
       'https://n8n.cinqa.space/webhook/7cfd8f0f-2d73-4ca8-8c1d-99cb4812b46b',
+      
       newPayload,
       { headers: { 'Content-Type': 'application/json' } },
     );
@@ -228,7 +229,6 @@ export class ImageService {
  async addNoise(base64: string, intensity = 1): Promise<any> {
   try {
 
-      
     // Validate and parse input
     const mimeMatch = base64.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,/);
     if (!mimeMatch) throw new Error('Invalid Base64 image format');
@@ -282,6 +282,9 @@ export class ImageService {
       let operation = await this.ai.models.generateVideos({
         model: 'veo-3.1-generate-preview',
         prompt: videoprompt,
+        config:{
+          aspectRatio: '9:16',
+        },
         ...videoObject,
       });
 
