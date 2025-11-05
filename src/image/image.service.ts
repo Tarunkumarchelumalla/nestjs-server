@@ -267,7 +267,7 @@ export class ImageService {
   }
 }
 
- async generateVideo(imageBytes: string, videoprompt: string): Promise<any> {
+ async generateVideo(imageBytes: string, videoprompt: string, aspectRatio?: string): Promise<any> {
     try {
       console.log('🎬 Starting Veo 3.1 video generation...');
 
@@ -283,7 +283,7 @@ export class ImageService {
         model: 'veo-3.1-generate-preview',
         prompt: videoprompt,
         config:{
-          aspectRatio: '9:16',
+          aspectRatio: aspectRatio || '9:16',
         },
         ...videoObject,
       });
