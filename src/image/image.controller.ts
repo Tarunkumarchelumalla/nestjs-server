@@ -1,5 +1,6 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { ImageService } from './image.service';
+import axios from 'axios';
 
 @Controller('image')
 export class ImageController {
@@ -51,6 +52,36 @@ export class ImageController {
     }catch(e){
       console.log(e);
       return {error:e};
+    }
+  }
+
+  @Post('url-to-base64')
+  async urlsToBase64(@Body() body: { urls: string[] }) {
+    try {
+      const base64Promises = body.urls.map(async (url) => {
+        try {
+          const response = await axios.get(url, { responseType: 'arraybuffer' });
+          const contentType = response.headers['content-type'];
+          const base64 = Buffer.from(response.data, 'binary').toString('base64');
+          return {
+            url,
+            base64: `data:${contentType};base64,${base64}`,
+            success: true
+          };
+        } catch (error) {
+          return {
+            url,
+            error: error.message,
+            success: false
+          };
+        }
+      });
+
+      const results = await Promise.all(base64Promises);
+      return { results };
+    } catch (error) {
+      console.error('Error processing URLs:', error);
+      return { error: error.message };
     }
   }
 }
