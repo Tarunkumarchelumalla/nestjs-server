@@ -277,7 +277,12 @@ export class ImageService {
           mimeType: 'image/png',
         } : {};
       
-        const ai = new GoogleGenAI({ apiKey: apiKey}); 
+
+        let ai = this.ai;
+        
+        if(apiKey){
+          ai =new GoogleGenAI({ apiKey: apiKey});
+        }
 
       // Step 1: Start video generation
       let operation = await ai.models.generateVideos({
