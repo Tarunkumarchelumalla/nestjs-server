@@ -267,7 +267,7 @@ export class ImageService {
   }
 }
 
- async generateVideo(imageBytes: string, videoprompt: string, aspectRatio?: string): Promise<any> {
+ async generateVideo(imageBytes: string, videoprompt: string, aspectRatio?: string,apiKey?:string): Promise<any> {
     try {
       console.log('🎬 Starting Veo 3.1 video generation...');
 
@@ -277,9 +277,10 @@ export class ImageService {
           mimeType: 'image/png',
         } : {};
       
+        const ai = new GoogleGenAI({ apiKey: apiKey}); 
 
       // Step 1: Start video generation
-      let operation = await this.ai.models.generateVideos({
+      let operation = await ai.models.generateVideos({
         model: 'veo-3.1-generate-preview',
         prompt: videoprompt,
         config:{
@@ -293,7 +294,7 @@ export class ImageService {
         console.log('⏳ Waiting for video generation to complete...');
         await new Promise((resolve) => setTimeout(resolve, 10000));
 
-        operation = await this.ai.operations.getVideosOperation({ operation });
+        operation = await ai.operations.getVideosOperation({ operation });
       }
 
       console.log('✅ Video generation complete! Downloading...');
@@ -311,7 +312,7 @@ export class ImageService {
       // Step 5: Save video locally
       const fileName = `veo_video_${Date.now()}.mp4`;
       const downloadPath = path.join(uploadsDir, fileName);
-      await this.ai.files.download({
+      await ai.files.download({
         file: videoFile,
         downloadPath,
       });

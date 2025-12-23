@@ -47,7 +47,7 @@ export class ImageController {
   @Post('generate-video')
   async generateVideo(@Body() body: any) {
     try{
-      const reponse = await this.imageService.generateVideo(body.base64,body.videoprompt,body.aspectRatio);
+      const reponse = await this.imageService.generateVideo(body.base64,body.videoprompt,body.aspectRatio,body.apiKey);
       return reponse;
     }catch(e){
       console.log(e);
