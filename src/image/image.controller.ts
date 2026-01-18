@@ -39,7 +39,28 @@ export class ImageController {
     }
   }
 
-    @Post('adkrity-text-heavy')
+    @Post('process-multiple-withnoise')
+  async processMultipleImages(
+    @Body() body: { imageUrls: string[]; noiseIntensity?: number }
+  ) {
+    try {
+      const { imageUrls, noiseIntensity = 1 } = body;
+      if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
+        throw new Error('imageUrls must be a non-empty array of image URLs');
+      }
+      
+      const results = await this.imageService.processMultipleImages(imageUrls, noiseIntensity);
+      return { success: true, results };
+    } catch (error) {
+      console.error('Error processing multiple images:', error);
+      return { 
+        success: false, 
+        error: error.message || 'Failed to process images' 
+      };
+    }
+  }
+
+  @Post('adkrity-text-heavy')
   async adkrityTextHeavy(@Body() body: any) {
     return this.imageService.adkrityTextHeavy(body);
   }

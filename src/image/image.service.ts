@@ -25,7 +25,41 @@ export class ImageService {
   }
   private readonly ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   
- 
+  async processMultipleImages(imageUrls: string[], noiseIntensity: number = 1): Promise<Array<{ url: string; base64?: string; error?: string;success?: boolean }>> {
+    const results: Array<{ url: string; base64?: string; error?: string;success?: boolean }> = [];
+    
+    for (const url of imageUrls) {
+      try {
+        // Download the image
+        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        const imageBuffer = Buffer.from(response.data, 'binary');
+        
+        // Convert to base64
+        const base64 = `data:${response.headers['content-type']};base64,${imageBuffer.toString('base64')}`;
+        
+        // Add noise
+        const processedImage = await this.addNoise(base64, noiseIntensity);
+        
+        const result: { url: string; base64: string;success?: boolean } = {
+          url,
+          base64: `${processedImage.base64}`,
+          success: true
+        };
+        results.push(result);
+      } catch (error) {
+        console.error(`Error processing image ${url}:`, error);
+        const result: { url: string; error: string;success?: boolean } = {
+          url,
+          error: `Failed to process image: ${error.message}`,
+          success: false
+        };
+        results.push(result);
+      }
+    }
+    
+    return results;
+  }
+
 
   parseBase64(b64: string, defaultMime = 'image/png') {
     let mimeType = defaultMime;
@@ -260,7 +294,7 @@ export class ImageService {
       // Return new Base64
       const newBase64 = canvas.toDataURL();
     const cleanBase64 = newBase64.replace(/^data:image\/\w+;base64,/, '');
-      return {cleanBase64,mime:'image/png'};
+      return {cleanBase64,mime:'image/png',base64:newBase64};
   } catch (err) {
     console.error('Error adding noise:', err);
     throw err;
