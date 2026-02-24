@@ -197,16 +197,18 @@ export class ImageService {
       const mime = this.getMimeFromUrl(inputPayload.logo_url);
       logoBase64 = await handleImage(inputPayload.logo_url, mime);
     }
-  
+    
+    const {category, phone_number, address, highlight_area, website, design_req, logo_url, productImages,...rest} = inputPayload;
+
     const newPayload = {
       category: inputPayload.category,
       phone_number: inputPayload.phone_number || "",
       address: inputPayload.address || "",
       highlight_area: inputPayload.highlight_area || "",
       website: inputPayload.website,
-      design_req: inputPayload.design_req,
       logo_url: logoBase64 || "",
       product_images: productImagesBase64 || [],
+      ...rest
     };
 
 
