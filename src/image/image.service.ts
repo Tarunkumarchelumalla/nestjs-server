@@ -262,41 +262,42 @@ export class ImageService {
   }
 
   
- async addNoise(base64: string, intensity = 1): Promise<any> {
+async addNoise(base64: string, intensity = 1): Promise<any> {
   try {
-
-    // Validate and parse input
     const mimeMatch = base64.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,/);
     if (!mimeMatch) throw new Error('Invalid Base64 image format');
-      console.log({mime:mimeMatch[1]});
-      
-    const mime = mimeMatch[1];
-    const data = base64.split(',')[1];
-    const buffer = Buffer.from(data, 'base64');
 
-    // Load image into canvas
-    const img = await loadImage(buffer);
+    const mime = mimeMatch[1];
+
+    // Pass full data URL instead of raw buffer
+    const img = await loadImage(base64);
     const canvas = createCanvas(img.width, img.height);
     const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
+    ctx.drawImage(img, 0, 0);
 
     // Extract pixel data
     const imageData = ctx.getImageData(0, 0, img.width, img.height);
     const pixels = imageData.data;
 
-      // Add subtle noise (±intensity)
+    // Add subtle noise (±intensity)
     for (let i = 0; i < pixels.length; i += 4) {
-      pixels[i] = Math.min(255, Math.max(0, pixels[i] + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity)));     // R
+      pixels[i]     = Math.min(255, Math.max(0, pixels[i]     + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity))); // R
       pixels[i + 1] = Math.min(255, Math.max(0, pixels[i + 1] + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity))); // G
       pixels[i + 2] = Math.min(255, Math.max(0, pixels[i + 2] + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity))); // B
+      // pixels[i + 3] is alpha — left untouched
     }
 
     ctx.putImageData(imageData, 0, 0);
 
-      // Return new Base64
-      const newBase64 = canvas.toDataURL();
-    const cleanBase64 = newBase64.replace(/^data:image\/\w+;base64,/, '');
-      return {cleanBase64,mime:'image/png',base64:newBase64};
+    // Return as same mime type if possible, fallback to png
+    const newBase64 = mime === 'image/jpeg'
+      ? canvas.toDataURL('image/jpeg', 0.95)
+      : canvas.toDataURL('image/png');
+
+    const cleanBase64 = newBase64.split(',')[1];
+    const outputMime = mime === 'image/jpeg' ? 'image/jpeg' : 'image/png';
+
+    return { cleanBase64, mime: outputMime, base64: newBase64 };
   } catch (err) {
     console.error('Error adding noise:', err);
     throw err;
