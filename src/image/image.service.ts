@@ -139,7 +139,9 @@ export class ImageService {
 
   async adkrityTextHeavy(inputPayload: any) {
     const invalidImages: string[] = [];
-  
+
+    console.log({prod:inputPayload.productImages})
+    
     async function getImageDimensions(url: string): Promise<{ width: number; height: number }> {
       try {
         const res = await fetch(url);
