@@ -266,6 +266,10 @@ async addNoise(base64: string, intensity = 1): Promise<any> {
   const mimeMatch = base64.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,/);
   const mime = mimeMatch ? mimeMatch[1] : 'image/png';
 
+  console.log({
+    base64
+  })
+  
   let img;
 
   // 🔒 Only protect loadImage
@@ -274,7 +278,7 @@ async addNoise(base64: string, intensity = 1): Promise<any> {
   } catch (err) {
     // 🚨 loadImage failed → return original safely
     return {
-      cleanBase64: base64.split(',')[1] || base64,
+      cleanBase64: base64.split(',')[1],
       mime,
       base64
     };
