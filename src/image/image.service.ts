@@ -137,95 +137,142 @@ export class ImageService {
 
 
 
-  async adkrityTextHeavy(inputPayload: any) {
-    const invalidImages: string[] = [];
+ async adkrityTextHeavy(inputPayload: any) {
+  const invalidImages: string[] = [];
 
-    console.log({prod:inputPayload.productImages})
-    
-    async function getImageDimensions(url: string): Promise<{ width: number; height: number }> {
-      try {
-        const res = await fetch(url);
-        const buffer = await res.arrayBuffer();
-        const { width, height } = imageSize(Buffer.from(buffer));
-  
-        if (!width || !height) {
-          throw new Error("Invalid dimensions");
-        }
-  
-        return { width, height };
-      } catch (err) {
-        console.error("Dimension check failed:", url, err);
-        return { width: 0, height: 0 };
-      }
-    }
-  
-    async function urlToBase64(url: string, mime: string) {
+  console.log("Incoming productImages:", inputPayload.productImages);
+
+  // ✅ Get image dimensions safely
+  async function getImageDimensions(url: string): Promise<{ width: number; height: number }> {
+    try {
       const res = await fetch(url);
+
+      if (!res.ok) {
+        throw new Error(`Fetch failed: ${res.status}`);
+      }
+
+      const buffer = await res.arrayBuffer();
+      const { width, height } = imageSize(Buffer.from(buffer));
+
+      if (!width || !height) {
+        throw new Error("Invalid dimensions");
+      }
+
+      return { width, height };
+    } catch (err) {
+      console.error("Dimension check failed:", url, err);
+      return { width: 0, height: 0 };
+    }
+  }
+
+  // ✅ Convert URL → Base64 safely
+  async function urlToBase64(url: string, mime: string) {
+    try {
+      const res = await fetch(url);
+
+      if (!res.ok) {
+        throw new Error(`Fetch failed: ${res.status}`);
+      }
+
       const buffer = await res.arrayBuffer();
       return `data:${mime};base64,${Buffer.from(buffer).toString("base64")}`;
+    } catch (err) {
+      console.error("Base64 conversion failed:", url, err);
+      return null;
     }
-  
-    const handleImage = async (url: string, mime: string = 'image/png') => {
+  }
+
+  // ✅ Main handler
+  const handleImage = async (url: string, mime: string = "image/png") => {
+    try {
       const { width, height } = await getImageDimensions(url);
       console.log("Checked:", url, "→", width, height);
-  
-      if (false) {
-        invalidImages.push(url);
-  
-        // Upload invalid image to Cloudinary
-        const { url: uploadedUrl, publicId } = await this.fileService.uploadToCloudinaryFromUrl(url);
-  
-        if (publicId) {
-          console.log("Resizing:", uploadedUrl);
 
-          const resizedUrl = `https://res.cloudinary.com/dknssnkrd/image/upload/c_pad,ar_1:1/${publicId}`;
-          return await urlToBase64(resizedUrl, mime);
-        }
-      }
-  
-      // Valid image
+      // Optional validation (enable if needed)
+      // if (width < 512 || height < 512) {
+      //   invalidImages.push(url);
+      // }
+
       return await urlToBase64(url, mime);
-    };
-  
-    const productImagesBase64 = await Promise.all(
-      (inputPayload.productImages || []).map(async (img: any) => {
-        const mime = this.getMimeFromUrl(img.url);
-        return await handleImage(img.url, mime);
-      })
-    );
-    
-    let logoBase64 = "";
-    if (inputPayload.logo_url) {
-      const mime = this.getMimeFromUrl(inputPayload.logo_url);
-      logoBase64 = await handleImage(inputPayload.logo_url, mime);
+    } catch (err) {
+      console.error("handleImage failed:", url, err);
+      return null;
     }
-    
-    const {category, phone_number, address, highlight_area, website, design_req, logo_url, productImages,...rest} = inputPayload;
+  };
 
-    const newPayload = {
-      category: inputPayload.category,
-      phone_number: inputPayload.phone_number || "",
-      address: inputPayload.address || "",
-      highlight_area: inputPayload.highlight_area || "",
-      website: inputPayload.website,
-      logo_url: logoBase64 || "",
-      product_images: productImagesBase64 || [],
-      ...rest
-    };
+  // ✅ Process product images
+  const productImagesBase64 = await Promise.all(
+    (inputPayload.productImages || []).map(async (img: any) => {
+      try {
+        const url = typeof img === "string" ? img : img?.url;
 
+        if (!url) {
+          console.warn("Invalid image input:", img);
+          return null;
+        }
 
-    const response = await axios.post(
-      'https://n8n.cinqa.space/webhook/7cfd8f0f-2d73-4ca8-8c1d-99cb4812b46b',
-      
-      newPayload,
-      { headers: { 'Content-Type': 'application/json' } },
-    );
+        const mime = this.getMimeFromUrl(url) || "image/png";
 
-    return { status: 'success', response: response.data };
+        return await handleImage(url, mime);
+      } catch (err) {
+        console.error("Image processing failed:", img, err);
+        return null;
+      }
+    })
+  );
 
+  // ✅ Remove failed/null images
+  const filteredProductImages = productImagesBase64.filter(Boolean);
+
+  // ✅ Process logo
+  let logoBase64 = "";
+  if (inputPayload.logo_url) {
+    try {
+      const mime = this.getMimeFromUrl(inputPayload.logo_url) || "image/png";
+      const result = await handleImage(inputPayload.logo_url, mime);
+      logoBase64 = result || "";
+    } catch (err) {
+      console.error("Logo processing failed:", err);
+    }
   }
-  
-  
+
+  // ✅ Clean payload
+  const {
+    category,
+    phone_number,
+    address,
+    highlight_area,
+    website,
+    design_req,
+    logo_url,
+    productImages,
+    ...rest
+  } = inputPayload;
+
+  const newPayload = {
+    category: category,
+    phone_number: phone_number || "",
+    address: address || "",
+    highlight_area: highlight_area || "",
+    website: website || "",
+    logo_url: logoBase64,
+    product_images: filteredProductImages,
+    ...rest,
+  };
+
+  console.log("FINAL BASE64 IMAGES COUNT:", filteredProductImages.length);
+
+  // ✅ API Call
+  const response = await axios.post(
+    "https://n8n.cinqa.space/webhook/7cfd8f0f-2d73-4ca8-8c1d-99cb4812b46b",
+    newPayload,
+    {
+      headers: { "Content-Type": "application/json" },
+    }
+  );
+
+  return { status: "success", response: response.data };
+}
   
   
   async resizeImageOnCloudinary(publicId: string, folder?: string) {
