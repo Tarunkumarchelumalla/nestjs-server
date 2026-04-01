@@ -263,45 +263,50 @@ export class ImageService {
 
   
 async addNoise(base64: string, intensity = 1): Promise<any> {
+  const mimeMatch = base64.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+
+  let img;
+
+  // 🔒 Only protect loadImage
   try {
-    const mimeMatch = base64.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,/);
-    if (!mimeMatch) throw new Error('Invalid Base64 image format');
+    img = await loadImage(base64);
+  } catch (err) {
+    // 🚨 loadImage failed → return original safely
+    return {
+      cleanBase64: base64.split(',')[1] || base64,
+      mime,
+      base64
+    };
+  }
 
-    const mime = mimeMatch[1];
+  // ✅ Continue normal processing if image loaded
+  const canvas = createCanvas(img.width, img.height);
+  const ctx = canvas.getContext('2d');
 
-    // Pass full data URL instead of raw buffer
-    const img = await loadImage(base64);
-    const canvas = createCanvas(img.width, img.height);
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0);
+  ctx.drawImage(img, 0, 0);
 
-    // Extract pixel data
-    const imageData = ctx.getImageData(0, 0, img.width, img.height);
-    const pixels = imageData.data;
+  const imageData = ctx.getImageData(0, 0, img.width, img.height);
+  const pixels = imageData.data;
 
-    // Add subtle noise (±intensity)
-    for (let i = 0; i < pixels.length; i += 4) {
-      pixels[i]     = Math.min(255, Math.max(0, pixels[i]     + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity))); // R
-      pixels[i + 1] = Math.min(255, Math.max(0, pixels[i + 1] + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity))); // G
-      pixels[i + 2] = Math.min(255, Math.max(0, pixels[i + 2] + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity))); // B
-      // pixels[i + 3] is alpha — left untouched
-    }
+  for (let i = 0; i < pixels.length; i += 4) {
+    pixels[i]     = Math.min(255, Math.max(0, pixels[i]     + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity)));
+    pixels[i + 1] = Math.min(255, Math.max(0, pixels[i + 1] + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity)));
+    pixels[i + 2] = Math.min(255, Math.max(0, pixels[i + 2] + (Math.floor(Math.random() * (2 * intensity + 1)) - intensity)));
+  }
 
-    ctx.putImageData(imageData, 0, 0);
+  ctx.putImageData(imageData, 0, 0);
 
-    // Return as same mime type if possible, fallback to png
-    const newBase64 = mime === 'image/jpeg'
+  const newBase64 =
+    mime === 'image/jpeg'
       ? canvas.toDataURL('image/jpeg', 0.95)
       : canvas.toDataURL('image/png');
 
-    const cleanBase64 = newBase64.split(',')[1];
-    const outputMime = mime === 'image/jpeg' ? 'image/jpeg' : 'image/png';
-
-    return { cleanBase64, mime: outputMime, base64: newBase64 };
-  } catch (err) {
-    console.error('Error adding noise:', err);
-    throw err;
-  }
+  return {
+    cleanBase64: newBase64.split(',')[1],
+    mime: mime === 'image/jpeg' ? 'image/jpeg' : 'image/png',
+    base64: newBase64
+  };
 }
 
  async generateVideo(imageBytes: string, videoprompt: string, aspectRatio?: string,apiKey?:string): Promise<any> {
