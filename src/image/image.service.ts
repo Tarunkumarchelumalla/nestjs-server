@@ -256,8 +256,8 @@ export class ImageService {
     highlight_area: highlight_area || "",
     website: website || "",
     logo_url: logoBase64,
-    product_images: filteredProductImages,
     ...rest,
+    product_images: filteredProductImages
   };
 
   console.log("FINAL BASE64 IMAGES COUNT:", filteredProductImages.length);
