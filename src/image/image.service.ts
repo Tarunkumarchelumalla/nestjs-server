@@ -362,77 +362,77 @@ async addNoise(base64: string, intensity = 1): Promise<any> {
   };
 }
 
- async generateVideo(imageBytes: string, videoprompt: string, aspectRatio?: string,apiKey?:string): Promise<any> {
-    try {
-      console.log('🎬 Starting Veo 3.1 video generation...');
+async generateVideo(imageBytes: string, videoprompt: string, aspectRatio?: string,apiKey?:string): Promise<any> {
+  try {
+    console.log('🎬 Starting Veo 3.1 video generation...');
 
-      const videoObject =
-        imageBytes ? {
-          imageBytes,
-          mimeType: 'image/png',
-        } : {};
+    const videoObject =
+      imageBytes ? {
+        imageBytes,
+        mimeType: 'image/png',
+      } : {};
+    
+
+      let ai = this.ai;
       
-
-        let ai = this.ai;
-        
-        if(apiKey){
-          ai =new GoogleGenAI({ apiKey: apiKey});
-        }
-
-      // Step 1: Start video generation
-      let operation = await ai.models.generateVideos({
-        model: 'veo-3.1-generate-preview',
-        prompt: videoprompt,
-        config:{
-          aspectRatio: aspectRatio || '9:16',
-        },
-        ...videoObject,
-      });
-
-      // Step 2: Poll until done
-      while (!operation.done) {
-        console.log('⏳ Waiting for video generation to complete...');
-        await new Promise((resolve) => setTimeout(resolve, 10000));
-
-        operation = await ai.operations.getVideosOperation({ operation });
+      if(apiKey){
+        ai =new GoogleGenAI({ apiKey: apiKey});
       }
 
-      console.log('✅ Video generation complete! Downloading...');
+    // Step 1: Start video generation
+    let operation = await ai.models.generateVideos({
+      model: 'veo-3.1-generate-preview',
+      prompt: videoprompt,
+      config:{
+        aspectRatio: aspectRatio || '9:16',
+      },
+      ...videoObject,
+    });
 
-      // Step 3: Extract and validate video file
-      const videoFile = operation.response?.generatedVideos?.[0]?.video;
-      if (!videoFile) throw new Error('No video file found in operation response.');
+    // Step 2: Poll until done
+    while (!operation.done) {
+      console.log('⏳ Waiting for video generation to complete...');
+      await new Promise((resolve) => setTimeout(resolve, 10000));
 
-      // Step 4: Ensure uploads directory exists
-      const uploadsDir = path.resolve('uploads/videos');
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
-      }
-
-      // Step 5: Save video locally
-      const fileName = `veo_video_${Date.now()}.mp4`;
-      const downloadPath = path.join(uploadsDir, fileName);
-      await ai.files.download({
-        file: videoFile,
-        downloadPath,
-      });
-
-      console.log(`🎥 Video saved at: ${downloadPath}`);
-
-      // Step 6: Return public URL
-      const baseUrl = process.env.SERVER_URL || 'http://localhost:3000';
-      const publicUrl = `${baseUrl}/uploads/videos/${fileName}`;
-
-      return {
-        success: true,
-        message: 'Video generated successfully',
-        fileName,
-        url: publicUrl,
-      };
-    } catch (error) {
-      console.error('❌ Error generating video:', error.message || error);
-      throw error;
+      operation = await ai.operations.getVideosOperation({ operation });
     }
+
+    console.log('✅ Video generation complete! Downloading...');
+
+    // Step 3: Extract and validate video file
+    const videoFile = operation.response?.generatedVideos?.[0]?.video;
+    if (!videoFile) throw new Error('No video file found in operation response.');
+
+    // Step 4: Ensure uploads directory exists
+    const uploadsDir = path.resolve('uploads/videos');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    // Step 5: Save video locally
+    const fileName = `veo_video_${Date.now()}.mp4`;
+    const downloadPath = path.join(uploadsDir, fileName);
+    await ai.files.download({
+      file: videoFile,
+      downloadPath,
+    });
+
+    console.log(`🎥 Video saved at: ${downloadPath}`);
+
+    // Step 6: Return public URL
+    const baseUrl = process.env.SERVER_URL || 'http://localhost:3000';
+    const publicUrl = `${baseUrl}/uploads/videos/${fileName}`;
+
+    return {
+      success: true,
+      message: 'Video generated successfully',
+      fileName,
+      url: publicUrl,
+    };
+  } catch (error) {
+    console.error('❌ Error generating video:', error.message || error);
+    throw error;
   }
+}
 
 }
