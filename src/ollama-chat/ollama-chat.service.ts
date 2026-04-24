@@ -53,7 +53,7 @@ interface ConversationContext {
 export class OllamaChatService {
   private readonly conversations = new Map<string, ConversationContext>();
   private readonly OLLAMA_URL = 'http://localhost:11434/api/chat';
-  private readonly MODEL = 'qwen3:4b';
+  private readonly MODEL = 'qwen3:1.7b';
   private readonly MAX_PAIRS = 10;
 
   constructor() {
@@ -110,7 +110,7 @@ export class OllamaChatService {
     } catch (err) {
       console.error('[ollama-chat] Ollama call failed:', err?.message || err);
       throw new ServiceUnavailableException(
-        'Ollama is unavailable. Ensure it is running on port 11434 with qwen3:4b pulled.',
+        'Ollama is unavailable. Ensure it is running on port 11434 with qwen3:1.7b pulled.',
       );
     }
 
