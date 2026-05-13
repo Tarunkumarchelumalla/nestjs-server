@@ -7,12 +7,13 @@ import { ConfigModule } from '@nestjs/config';
 import { AgentsModule } from './agents/agents.module';
 import { AdkrityVideoGenModule } from './adkrity-video-gen/adkrity-video-gen.module';
 import { OllamaChatModule } from './ollama-chat/ollama-chat.module';
+import { UgcVideoModule } from './ugc-video/ugc-video.module';
+import { ProVideoModule } from './pro-video/pro-video.module';
 
 @Module({
   imports: [ConfigModule.forRoot({
-    isGlobal: true, // makes process.env available everywhere
-    // optionally: envFilePath: '.env'
-  }), ImageModule, FileModule, AgentsModule, AdkrityVideoGenModule, OllamaChatModule],
+    isGlobal: true,
+  }), ImageModule, FileModule, AgentsModule, AdkrityVideoGenModule, OllamaChatModule, UgcVideoModule, ProVideoModule],
   controllers: [AppController],
   providers: [AppService],
 })
