@@ -20,12 +20,19 @@ export class ProVideoService {
   }
 
   async generateProVideo(dto: GenerateProVideoDto) {
+    // Handle multiple images via imageUrls array
+    if (dto.imageUrls && dto.imageUrls.length > 0) {
+      return this.generateProVideoBatch(dto);
+    }
+
+    // Single image fallback (backward compatibility)
+    const imageUrl = dto.imageUrl || '';
     const { data, error } = await this.supabase
       .from('ugc_video_jobs')
       .insert({
         status: 'pending',
         prompt: dto.prompt || 'gnerate a video state of the art and use upbeat music and make it viral on tiktok',
-        image_url: dto.imageUrl,
+        image_url: imageUrl,
       })
       .select('id')
       .single();
@@ -36,11 +43,62 @@ export class ProVideoService {
 
     const jobId = data.id as string;
 
-    this.runPipeline(jobId, dto).catch((err) =>
+    this.runPipeline(jobId, imageUrl, dto.prompt).catch((err) =>
       console.error('[pro-video] Pipeline error:', err?.message || err),
     );
 
     return { message: 'Pro video generation started.', jobId };
+  }
+
+  async generateProVideoBatch(dto: GenerateProVideoDto) {
+    const imageUrls = dto.imageUrls || (dto.imageUrl ? [dto.imageUrl] : []);
+
+    if (!imageUrls || imageUrls.length === 0) {
+      throw new Error('No image URLs provided');
+    }
+
+    const defaultPrompt = dto.prompt || 'gnerate a video state of the art and use upbeat music and make it viral on tiktok';
+
+    // Create all jobs in parallel
+    const jobPromises = imageUrls.map((imageUrl) =>
+      this.supabase
+        .from('ugc_video_jobs')
+        .insert({
+          status: 'pending',
+          prompt: defaultPrompt,
+          image_url: imageUrl,
+        })
+        .select('id')
+        .single(),
+    );
+
+    const results = await Promise.all(jobPromises);
+
+    const jobIds: string[] = [];
+    const errors: string[] = [];
+
+    results.forEach((result, index) => {
+      if (result.error || !result.data) {
+        errors.push(`Image ${index}: ${result.error?.message}`);
+      } else {
+        const jobId = result.data.id as string;
+        jobIds.push(jobId);
+        // Start pipeline asynchronously for each job
+        this.runPipeline(jobId, imageUrls[index], defaultPrompt).catch((err) =>
+          console.error('[pro-video] Pipeline error:', err?.message || err),
+        );
+      }
+    });
+
+    if (jobIds.length === 0) {
+      throw new Error('Failed to create jobs: ' + errors.join('; '));
+    }
+
+    return {
+      message: `Pro video generation started for ${jobIds.length}/${imageUrls.length} images.`,
+      jobIds,
+      ...(errors.length > 0 && { warnings: errors }),
+    };
   }
 
   async getJobStatus(jobId: string) {
@@ -54,7 +112,7 @@ export class ProVideoService {
     return data;
   }
 
-  private async runPipeline(jobId: string, dto: GenerateProVideoDto): Promise<void> {
+  private async runPipeline(jobId: string, imageUrl: string, prompt: string): Promise<void> {
     try {
       await this.updateJob(jobId, { status: 'processing' });
 
@@ -65,10 +123,10 @@ export class ProVideoService {
         {
           model: MODEL,
           content: [
-            { type: 'text', text: dto.prompt },
+            { type: 'text', text: prompt },
             {
               type: 'image_url',
-              image_url: { url: dto.imageUrl },
+              image_url: { url: imageUrl },
               role: 'reference_image',
             },
           ],

@@ -8,12 +8,23 @@ export class ProVideoController {
 
   /**
    * POST /api/pro-video/generate
-   * Body: { prompt, imageUrl }
+   * Body: { prompt, imageUrl } (single) or { prompt, imageUrls: [...] } (multiple)
    */
   @Post('generate')
   @HttpCode(202)
   async generate(@Body() dto: GenerateProVideoDto) {
     return this.service.generateProVideo(dto);
+  }
+
+  /**
+   * POST /api/pro-video/generate-batch
+   * Body: { prompt, imageUrls: [...] }
+   * Generates videos for multiple images in parallel
+   */
+  @Post('generate-batch')
+  @HttpCode(202)
+  async generateBatch(@Body() dto: GenerateProVideoDto) {
+    return this.service.generateProVideoBatch(dto);
   }
 
   /** GET /api/pro-video/status/:jobId */
