@@ -6,25 +6,11 @@ import { GenerateProVideoDto } from './dto/generate-pro-video.dto';
 export class ProVideoController {
   constructor(private readonly service: ProVideoService) {}
 
-  /**
-   * POST /api/pro-video/generate
-   * Body: { prompt, imageUrl } (single) or { prompt, imageUrls: [...] } (multiple)
-   */
+  /** POST /api/pro-video/generate */
   @Post('generate')
   @HttpCode(202)
   async generate(@Body() dto: GenerateProVideoDto) {
     return this.service.generateProVideo(dto);
-  }
-
-  /**
-   * POST /api/pro-video/generate-batch
-   * Body: { prompt, imageUrls: [...] }
-   * Generates videos for multiple images in parallel
-   */
-  @Post('generate-batch')
-  @HttpCode(202)
-  async generateBatch(@Body() dto: GenerateProVideoDto) {
-    return this.service.generateProVideoBatch(dto);
   }
 
   /** GET /api/pro-video/status/:jobId */
