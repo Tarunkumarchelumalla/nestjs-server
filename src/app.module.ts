@@ -9,11 +9,12 @@ import { AdkrityVideoGenModule } from './adkrity-video-gen/adkrity-video-gen.mod
 import { OllamaChatModule } from './ollama-chat/ollama-chat.module';
 import { UgcVideoModule } from './ugc-video/ugc-video.module';
 import { ProVideoModule } from './pro-video/pro-video.module';
+import { R2UploadModule } from './r2/r2.module';
 
 @Module({
   imports: [ConfigModule.forRoot({
     isGlobal: true,
-  }), ImageModule, FileModule, AgentsModule, AdkrityVideoGenModule, OllamaChatModule, UgcVideoModule, ProVideoModule],
+  }), ImageModule, FileModule, AgentsModule, AdkrityVideoGenModule, OllamaChatModule, UgcVideoModule, ProVideoModule, R2UploadModule],
   controllers: [AppController],
   providers: [AppService],
 })
