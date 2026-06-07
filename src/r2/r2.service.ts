@@ -10,6 +10,37 @@ export class R2UploadService {
   private readonly bucket = process.env.R2_BUCKET;
   private readonly publicUrl = process.env.R2_PUBLIC_URL;
 
+  private static readonly EXT_MAP: Record<string, string> = {
+    // Images
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+    // Audio
+    'audio/ogg': 'ogg',
+    'audio/mpeg': 'mp3',
+    'audio/mp4': 'm4a',
+    'audio/aac': 'aac',
+    'audio/amr': 'amr',
+    'audio/opus': 'opus',
+    // Video
+    'video/mp4': 'mp4',
+    'video/3gpp': '3gp',
+    // Documents
+    'application/pdf': 'pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+    'application/msword': 'doc',
+    'application/vnd.ms-excel': 'xls',
+    'application/vnd.ms-powerpoint': 'ppt',
+    'text/plain': 'txt',
+    'text/csv': 'csv',
+    'application/zip': 'zip',
+    'application/x-rar-compressed': 'rar',
+    'application/json': 'json',
+  };
+
   private hmac(key: Buffer | string, data: string): Buffer {
     return crypto.createHmac('sha256', key).update(data).digest();
   }
@@ -36,20 +67,23 @@ export class R2UploadService {
     const signedHeaders = 'content-type;host;x-amz-content-sha256;x-amz-date';
     const canonicalRequest = [
       'PUT', canonicalUri, '',
-      canonicalHeaders, signedHeaders, payloadHash
+      canonicalHeaders, signedHeaders, payloadHash,
     ].join('\n');
 
     const credentialScope = `${dateOnly}/${region}/${service}/aws4_request`;
     const stringToSign = [
       'AWS4-HMAC-SHA256', amzDate, credentialScope,
-      this.sha256Hex(canonicalRequest)
+      this.sha256Hex(canonicalRequest),
     ].join('\n');
 
-    const kDate    = this.hmac(`AWS4${this.secretKey}`, dateOnly);
-    const kRegion  = this.hmac(kDate, region);
+    const kDate = this.hmac(`AWS4${this.secretKey}`, dateOnly);
+    const kRegion = this.hmac(kDate, region);
     const kService = this.hmac(kRegion, service);
     const kSigning = this.hmac(kService, 'aws4_request');
-    const signature = crypto.createHmac('sha256', kSigning).update(stringToSign).digest('hex');
+    const signature = crypto
+      .createHmac('sha256', kSigning)
+      .update(stringToSign)
+      .digest('hex');
 
     return {
       uploadUrl: `https://${host}${canonicalUri}`,
@@ -59,27 +93,35 @@ export class R2UploadService {
         'x-amz-date': amzDate,
         'x-amz-content-sha256': payloadHash,
         'Content-Length': String(body.length),
-      }
+      },
     };
   }
 
-  private putToR2(uploadUrl: string, body: Buffer, headers: Record<string, string>): Promise<void> {
+  private putToR2(
+    uploadUrl: string,
+    body: Buffer,
+    headers: Record<string, string>,
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       const url = new URL(uploadUrl);
       const req = https.request(
         { hostname: url.hostname, path: url.pathname, method: 'PUT', headers },
-        (res:any) => {
+        (res: any) => {
           if (res.statusCode >= 200 && res.statusCode < 300) {
             res.resume();
             resolve();
           } else {
             const chunks: Buffer[] = [];
-            res.on('data', c => chunks.push(c));
+            res.on('data', (c) => chunks.push(c));
             res.on('end', () =>
-              reject(new Error(`R2 ${res.statusCode}: ${Buffer.concat(chunks).toString()}`))
+              reject(
+                new Error(
+                  `R2 ${res.statusCode}: ${Buffer.concat(chunks).toString()}`,
+                ),
+              ),
             );
           }
-        }
+        },
       );
       req.on('error', reject);
       req.write(body);
@@ -87,11 +129,33 @@ export class R2UploadService {
     });
   }
 
-  async upload(imageBase64: string, mimeType: string, chatId: string, messageId: string) {
+  private resolveExt(mime: string, filename?: string): string {
+    // Try from mime map first
+    if (R2UploadService.EXT_MAP[mime]) return R2UploadService.EXT_MAP[mime];
+
+    // Try from original filename
+    if (filename) {
+      const parts = filename.split('.');
+      if (parts.length > 1) return parts.pop()!.toLowerCase();
+    }
+
+    // Fallback: grab subtype from mime
+    const sub = mime.split('/').pop() || 'bin';
+    return sub.includes('+') ? sub.split('+')[0] : sub;
+  }
+
+  async upload(
+    mediaBase64: string,
+    mimeType: string,
+    chatId: string,
+    messageId: string,
+    mediaType: string = 'image',
+    filename?: string,
+  ) {
     const mime = mimeType.split(';')[0];
-    const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
-    const r2Key = `wa-images/${chatId}/${messageId}.${ext}`;
-    const body = Buffer.from(imageBase64, 'base64');
+    const ext = this.resolveExt(mime, filename);
+    const r2Key = `wa-media/${mediaType}/${chatId}/${messageId}.${ext}`;
+    const body = Buffer.from(mediaBase64, 'base64');
 
     const { uploadUrl, headers } = this.buildSignedHeaders(r2Key, body, mime);
     await this.putToR2(uploadUrl, body, headers);
