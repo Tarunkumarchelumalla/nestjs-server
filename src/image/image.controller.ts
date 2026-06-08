@@ -1,10 +1,14 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { ImageService } from './image.service';
 import axios from 'axios';
+import OpenAI from 'openai';
+import { GenerateImageDto } from './dto/generat-image-dto';
 
 @Controller('image')
 export class ImageController {
   constructor(private readonly imageService: ImageService) {}
+
+
 
   @Post('edit')
   async editImage(@Body() body: { imageBase64: string; maskBase64?: string; prompt?: string; size?: string }) {
@@ -51,7 +55,7 @@ export class ImageController {
       
       const results = await this.imageService.processMultipleImages(imageUrls, noiseIntensity);
       return { success: true, results };
-    } catch (error) {
+    } catch (error:any) {
       console.error('Error processing multiple images:', error);
       return { 
         success: false, 
@@ -89,7 +93,7 @@ export class ImageController {
             base64: `data:${contentType};base64,${base64}`,
             success: true
           };
-        } catch (error) {
+        } catch (error:any) {
           return {
             url,
             error: error.message,
@@ -100,9 +104,21 @@ export class ImageController {
 
       const results = await Promise.all(base64Promises);
       return { results };
-    } catch (error) {
+    } catch (error:any) {
       console.error('Error processing URLs:', error);
       return { error: error.message };
     }
   }
+
+
+
+  @Post('generate')
+  async generate(@Body() body: GenerateImageDto) {
+    return this.imageService.generateImage(
+      body.prompt,
+      body.imagesBase64,
+      body.size,
+    );
+  }
+
 }

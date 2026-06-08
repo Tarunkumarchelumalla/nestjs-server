@@ -9,9 +9,14 @@ import fetch from 'node-fetch';
 import * as fs from 'fs';
 import { GoogleGenAI } from '@google/genai';
 import path from 'path';
+import OpenAI from 'openai';
 
 @Injectable()
 export class ImageService {
+
+ private openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
 
 
   constructor(private  fileService: FileService) {
@@ -429,10 +434,83 @@ async generateVideo(imageBytes: string, videoprompt: string, aspectRatio?: strin
       fileName,
       url: publicUrl,
     };
-  } catch (error) {
+  } catch (error:any) {
     console.error('❌ Error generating video:', error.message || error);
     throw error;
   }
 }
+
+  async generateImage(
+    prompt: string,
+    imagesBase64: string[],
+    size = '1024x1024',
+  ) {
+    try {
+      if (!imagesBase64?.length) {
+        throw new BadRequestException(
+          'At least one image is required',
+        );
+      }
+
+      const tempFiles: string[] = [];
+
+      // convert all base64 images into temp files
+      const imageStreams = imagesBase64.map((base64, index) => {
+        const cleanedBase64 = base64.replace(
+          /^data:image\/\w+;base64,/,
+          '',
+        );
+
+        const imageBuffer = Buffer.from(
+          cleanedBase64,
+          'base64',
+        );
+
+        const tempPath = path.join(
+          process.cwd(),
+          `temp-${Date.now()}-${index}.png`,
+        );
+
+        fs.writeFileSync(tempPath, imageBuffer);
+
+        tempFiles.push(tempPath);
+
+        return fs.createReadStream(tempPath);
+      });
+
+      // OPENAI REQUEST
+      const result = await this.openai.images.edit({
+        model: 'gpt-image-2',
+        image: imageStreams,
+        prompt,
+        size: size as any,
+      });
+
+      // cleanup temp files
+      tempFiles.forEach((file) => {
+        if (fs.existsSync(file)) {
+          fs.unlinkSync(file);
+        }
+      });
+
+      if (!result.data?.length) {
+        throw new BadRequestException(
+          'No image generated',
+        );
+      }
+
+      return {
+        success: true,
+        image_base64: result.data[0].b64_json,
+      };
+    } catch (error: any) {
+      console.error(error);
+
+      throw new BadRequestException(
+        error?.message || 'Image generation failed',
+      );
+    }
+  }
+
 
 }
