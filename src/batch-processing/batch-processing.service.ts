@@ -151,6 +151,18 @@ export class BatchProcessingService {
     const itemId = customId.replace('img-edit-', '');
     this.logger.log(`Processing image result for itemId=${itemId}`);
 
+    // Check if the item has been cancelled in the database
+    const { data: itemData } = await this.supabase
+      .from('processing_job_items')
+      .select('stage')
+      .eq('id', itemId)
+      .single();
+
+    if (itemData?.stage === 'cancelled') {
+      this.logger.log(`Item ${itemId} is cancelled. Skipping processing.`);
+      return;
+    }
+
     // Check if line contains request level error
     if (line.error) {
       const errorMsg = typeof line.error === 'object' ? JSON.stringify(line.error) : String(line.error);
@@ -221,6 +233,18 @@ export class BatchProcessingService {
 
     const itemId = customId.replace('content-gen-', '');
     this.logger.log(`Processing content result for itemId=${itemId}`);
+
+    // Check if the item has been cancelled in the database
+    const { data: itemData } = await this.supabase
+      .from('processing_job_items')
+      .select('stage')
+      .eq('id', itemId)
+      .single();
+
+    if (itemData?.stage === 'cancelled') {
+      this.logger.log(`Item ${itemId} is cancelled. Skipping processing.`);
+      return;
+    }
 
     // Check if line contains request level error
     if (line.error) {
