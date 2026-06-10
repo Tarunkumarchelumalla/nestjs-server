@@ -1,40 +1,28 @@
-import { privateDecrypt, constants } from 'crypto';
-
 /**
- * Decrypts a base64-encoded RSA-encrypted string using the server's private key.
+ * Simple Base64 + salt obfuscation for API keys.
  *
- * Client side (encryption):
- *   const encrypted = crypto.publicEncrypt(
- *     { key: publicKey, padding: crypto.constants.RSA_PKCS1_OAEP_PADDING },
- *     Buffer.from(plaintext),
- *   );
- *   const base64Payload = encrypted.toString('base64');
+ * Client side (encode before sending):
+ *   const encoded = btoa(SALT + apiKey);   // browser
+ *   // or in Node:
+ *   const encoded = Buffer.from(SALT + apiKey).toString('base64');
  *
- * Server side (decryption) — handled here automatically.
+ * Server side (decoded here automatically).
  *
  * Requires env var:
- *   RSA_PRIVATE_KEY — PEM private key with literal \n characters
- *   e.g.  RSA_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----"
+ *   API_KEY_SALT — shared secret salt, e.g.  API_KEY_SALT=mySecretSalt123
  */
-export function decryptRsa(encryptedBase64: string): string {
-  const rawKey = process.env.RSA_PRIVATE_KEY;
+export function decryptApiKey(encodedApiKey: string): string {
+  const salt = process.env.API_KEY_SALT;
 
-  if (!rawKey) {
-    throw new Error('RSA_PRIVATE_KEY is not set in environment variables');
+  if (!salt) {
+    throw new Error('API_KEY_SALT is not set in environment variables');
   }
 
-  // Support both real newlines and escaped \n stored in .env
-  const privateKey = rawKey.replace(/\\n/g, '\n');
+  const decoded = Buffer.from(encodedApiKey, 'base64').toString('utf8');
 
-  const encryptedBuffer = Buffer.from(encryptedBase64, 'base64');
+  if (!decoded.startsWith(salt)) {
+    throw new Error('Invalid apiKey: salt mismatch');
+  }
 
-  const decrypted = privateDecrypt(
-    {
-      key: privateKey,
-      padding: constants.RSA_PKCS1_OAEP_PADDING,
-    },
-    encryptedBuffer,
-  );
-
-  return decrypted.toString('utf8');
+  return decoded.slice(salt.length);
 }

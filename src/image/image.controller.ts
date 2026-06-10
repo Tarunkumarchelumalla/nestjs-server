@@ -3,16 +3,16 @@ import { ImageService } from './image.service';
 import axios from 'axios';
 import OpenAI from 'openai';
 import { GenerateImageDto } from './dto/generat-image-dto';
-import { decryptRsa } from '../common/crypto.util';
+import { decryptApiKey } from '../common/crypto.util';
 
 @Controller('image')
 export class ImageController {
   constructor(private readonly imageService: ImageService) {}
 
-  /** Decrypts an RSA-encrypted, base64-encoded apiKey. Returns it as-is if falsy. */
-  private resolveApiKey(encryptedApiKey?: string): string | undefined {
-    if (!encryptedApiKey) return undefined;
-    return decryptRsa(encryptedApiKey);
+  /** Decodes a base64+salt encoded apiKey. Returns undefined if not provided. */
+  private resolveApiKey(encodedApiKey?: string): string | undefined {
+    if (!encodedApiKey) return undefined;
+    return decryptApiKey(encodedApiKey);
   }
 
   @Post('edit')
