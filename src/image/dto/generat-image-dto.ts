@@ -6,7 +6,7 @@ import {
 
 export class GenerateImageDto {
   @IsString()
-  prompt: string ; 
+  prompt: string ;
 
   @IsArray()
   imagesBase64: string[] ;
@@ -14,4 +14,8 @@ export class GenerateImageDto {
   @IsOptional()
   @IsString()
   size?: string;
+
+  @IsOptional()
+  @IsString()
+  apiKey?: string;
 }

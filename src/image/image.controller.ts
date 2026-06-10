@@ -11,7 +11,7 @@ export class ImageController {
 
 
   @Post('edit')
-  async editImage(@Body() body: { imageBase64: string; maskBase64?: string; prompt?: string; size?: string }) {
+  async editImage(@Body() body: { imageBase64: string; maskBase64?: string; prompt?: string; size?: string; apiKey?: string }) {
     try{
       const reponse = await this.imageService.editImage(body);
       return {...reponse  };
@@ -22,7 +22,7 @@ export class ImageController {
   }
 
   @Post('erase')
-  async eraseImage(@Body() body: { imageBase64: string; maskBase64: string; prompt?: string; size?: string }) {
+  async eraseImage(@Body() body: { imageBase64: string; maskBase64: string; prompt?: string; size?: string; apiKey?: string }) {
     try{
       const reponse = await this.imageService.eraseImage(body);
       return {...reponse  };
@@ -118,6 +118,7 @@ export class ImageController {
       body.prompt,
       body.imagesBase64,
       body.size,
+      body.apiKey,
     );
   }
 

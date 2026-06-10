@@ -84,8 +84,9 @@ export class ImageService {
     maskBase64?: string;
     prompt?: string;
     size?: string;
+    apiKey?: string;
   }) {
-    const { imageBase64, maskBase64, prompt, size } = payload;
+    const { imageBase64, maskBase64, prompt, size, apiKey } = payload;
 
     if (!imageBase64) throw new BadRequestException('imageBase64 is required');
 
@@ -104,7 +105,7 @@ export class ImageService {
 
     const response = await axios.post('https://api.openai.com/v1/images/edits', formData, {
       headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${apiKey || process.env.OPENAI_API_KEY}`,
         ...formData.getHeaders(),
       },
     });
@@ -112,8 +113,8 @@ export class ImageService {
     return response.data;
   }
 
-  async eraseImage(payload: { imageBase64: string; maskBase64: string; prompt?: string; size?: string }) {
-    const { imageBase64, maskBase64, prompt, size } = payload;
+  async eraseImage(payload: { imageBase64: string; maskBase64: string; prompt?: string; size?: string; apiKey?: string }) {
+    const { imageBase64, maskBase64, prompt, size, apiKey } = payload;
 
     if (!imageBase64 || !maskBase64) {
       throw new BadRequestException('imageBase64 and maskBase64 are required');
@@ -131,7 +132,7 @@ export class ImageService {
 
     const response = await axios.post('https://api.openai.com/v1/images/edits', formData, {
       headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${apiKey || process.env.OPENAI_API_KEY}`,
         ...formData.getHeaders(),
       },
     });
@@ -444,6 +445,7 @@ async generateVideo(imageBytes: string, videoprompt: string, aspectRatio?: strin
     prompt: string,
     imagesBase64: string[],
     size = '1024x1024',
+    apiKey?: string,
   ) {
     try {
       if (!imagesBase64?.length) {
@@ -478,8 +480,10 @@ async generateVideo(imageBytes: string, videoprompt: string, aspectRatio?: strin
         return fs.createReadStream(tempPath);
       });
 
+      const openai = apiKey ? new OpenAI({ apiKey }) : this.openai;
+
       // OPENAI REQUEST
-      const result = await this.openai.images.edit({
+      const result = await openai.images.edit({
         model: 'gpt-image-2',
         image: imageStreams,
         prompt,
