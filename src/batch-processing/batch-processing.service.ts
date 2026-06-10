@@ -17,8 +17,7 @@ export class BatchProcessingService {
     private readonly fileService: FileService,
   ) {
     this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('SHOPIFY_OPENAI_API_KEY') || 
-              this.configService.get<string>('OPENAI_API_KEY'),
+      apiKey: this.configService.get<string>('SHOPIFY_OPENAI_API_KEY'),
     });
 
     this.supabase = createClient(
@@ -96,7 +95,7 @@ export class BatchProcessingService {
     batchType: 'image' | 'content'
   ): Promise<{ successCount: number; failedCount: number }> {
     const url = `https://api.openai.com/v1/files/${fileId}/content`;
-    const apiKey = this.configService.get<string>('OPENAI_API_KEY');
+    const apiKey = this.configService.get<string>('SHOPIFY_OPENAI_API_KEY');
 
     this.logger.log(`Downloading file ${fileId} from OpenAI as stream...`);
 
