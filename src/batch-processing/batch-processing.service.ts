@@ -50,6 +50,27 @@ export class BatchProcessingService {
         if (batch.errors?.data && batch.errors.data.length > 0) {
           errorMsg += `. Errors: ${JSON.stringify(batch.errors.data)}`;
         }
+
+        const isTerminalFailure = ['failed', 'cancelled', 'expired'].includes(batch.status);
+        if (isTerminalFailure) {
+          this.logger.warn(`OpenAI batch ${batchId} is in terminal non-completed state '${batch.status}'. Failing associated items.`);
+          
+          // 1. Fail all associated items that are still in progress
+          try {
+            await this.failAllAssociatedItems(batchId, batchType, errorMsg);
+          } catch (failErr) {
+            this.logger.error(`Failed to clean up items for batch ${batchId}: ${failErr.message}`, failErr.stack);
+          }
+
+          // 2. Update batch worker status to failed
+          await this.updateBatchWorkerStatus(batchId, 'failed', {
+            last_error: errorMsg,
+            processed_at: new Date().toISOString(),
+          });
+
+          return; // Return gracefully so BullMQ does not retry
+        }
+
         throw new Error(errorMsg);
       }
 
