@@ -46,7 +46,11 @@ export class BatchProcessingService {
       this.logger.log(`Retrieved batch ${batchId} status from OpenAI: ${batch.status}`);
 
       if (batch.status !== 'completed') {
-        throw new Error(`OpenAI batch is not completed. Current status: ${batch.status}`);
+        let errorMsg = `OpenAI batch is not completed. Current status: ${batch.status}`;
+        if (batch.errors?.data && batch.errors.data.length > 0) {
+          errorMsg += `. Errors: ${JSON.stringify(batch.errors.data)}`;
+        }
+        throw new Error(errorMsg);
       }
 
       const outputFileId = batch.output_file_id;
@@ -77,7 +81,14 @@ export class BatchProcessingService {
     } catch (error) {
       this.logger.error(`Error processing batch job ${batchId}: ${error.message}`, error.stack);
       
-      // Update batch status to failed
+      // 1. Fail all associated items that are still in progress
+      try {
+        await this.failAllAssociatedItems(batchId, batchType, error.message);
+      } catch (failErr) {
+        this.logger.error(`Failed to clean up items for batch ${batchId}: ${failErr.message}`, failErr.stack);
+      }
+
+      // 2. Update batch status to failed
       await this.updateBatchWorkerStatus(batchId, 'failed', {
         last_error: error.message,
         processed_at: new Date().toISOString(),
@@ -407,9 +418,47 @@ export class BatchProcessingService {
   }
 
   /**
+   * Helper to update status of all items associated with a failed/cancelled batch
+   */
+  async failAllAssociatedItems(
+    batchId: string,
+    batchType: 'image' | 'content',
+    errorMessage: string
+  ): Promise<void> {
+    this.logger.warn(`Failing all items associated with batchId=${batchId}, type=${batchType}: ${errorMessage}`);
+
+    const payloadField = batchType === 'image' ? 'image_batch_id' : 'content_batch_id';
+
+    // Query items where payload contains the batchId
+    const { data: items, error: fetchError } = await this.supabase
+      .from('processing_job_items')
+      .select('id, product_id, image_result_status, content_result_status')
+      .eq(`payload->>${payloadField}`, batchId);
+
+    if (fetchError) {
+      this.logger.error(`Failed to fetch items for failed batch ${batchId}: ${fetchError.message}`);
+      return;
+    }
+
+    if (!items || items.length === 0) {
+      this.logger.log(`No items found associated with batchId=${batchId}, type=${batchType}`);
+      return;
+    }
+
+    for (const item of items) {
+      const currentStatus = batchType === 'image' ? item.image_result_status : item.content_result_status;
+      if (currentStatus === 'completed' || currentStatus === 'failed') {
+        continue;
+      }
+
+      await this.updateItemStatusAndError(item.id, batchType, 'failed', errorMessage);
+    }
+  }
+
+  /**
    * Helper to update status in openai_batches table
    */
-  private async updateBatchWorkerStatus(batchId: string, status: string, additionalFields: any = {}): Promise<void> {
+  async updateBatchWorkerStatus(batchId: string, status: string, additionalFields: any = {}): Promise<void> {
     const { error } = await this.supabase
       .from('openai_batches')
       .update({

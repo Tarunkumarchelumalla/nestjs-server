@@ -1,6 +1,7 @@
 import { Controller, Post, Body, BadRequestException, HttpCode, HttpStatus } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { BatchProcessingService } from './batch-processing.service';
 
 interface EnqueueBatchDto {
   batchId: string;
@@ -13,6 +14,7 @@ export class BatchProcessingController {
   constructor(
     @InjectQueue('image-batch') private readonly imageQueue: Queue,
     @InjectQueue('content-batch') private readonly contentQueue: Queue,
+    private readonly batchProcessingService: BatchProcessingService,
   ) {}
 
   @Post('enqueue')
@@ -61,6 +63,18 @@ export class BatchProcessingController {
           batchId,
         };
       }
+    }
+
+    // Update the database status to 'queued' before adding to queue to avoid duplicate trigger race condition
+    try {
+      await this.batchProcessingService.updateBatchWorkerStatus(batchId, 'queued', {
+        enqueued_at: new Date().toISOString(),
+        worker_queue: `${batchType}-batch`,
+        worker_job_id: batchId,
+      });
+      console.log(`[BatchProcessingController] Updated worker_status to 'queued' for batchId=${batchId}`);
+    } catch (dbErr) {
+      console.error(`[BatchProcessingController] Failed to update worker_status to 'queued' for batchId=${batchId}:`, dbErr);
     }
 
     if (batchType === 'image') {
