@@ -46,6 +46,23 @@ export class BatchProcessingController {
       },
     };
 
+    const queue = batchType === 'image' ? this.imageQueue : this.contentQueue;
+    const existingJob = await queue.getJob(batchId);
+    if (existingJob) {
+      const state = await existingJob.getState();
+      if (['failed', 'completed'].includes(state)) {
+        console.log(`[BatchProcessingController] Job ${batchId} was in state '${state}'. Removing old job to allow retry.`);
+        await existingJob.remove();
+      } else {
+        console.log(`[BatchProcessingController] Job ${batchId} already exists in active/pending state '${state}'. Skipping enqueue.`);
+        return {
+          success: true,
+          message: `Batch job already active in ${batchType}-batch queue (state: ${state})`,
+          batchId,
+        };
+      }
+    }
+
     if (batchType === 'image') {
       await this.imageQueue.add('process-image-batch', jobPayload, options);
       console.log(`[BatchProcessingController] Enqueued image batch ${batchId} to image-batch queue`);
