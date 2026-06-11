@@ -9,7 +9,7 @@ import fetch from 'node-fetch';
 import * as fs from 'fs';
 import { GoogleGenAI } from '@google/genai';
 import path from 'path';
-import OpenAI from 'openai';
+import OpenAI, { toFile } from 'openai';
 
 @Injectable()
 export class ImageService {
@@ -454,47 +454,25 @@ async generateVideo(imageBytes: string, videoprompt: string, aspectRatio?: strin
         );
       }
 
-      const tempFiles: string[] = [];
-
-      // convert all base64 images into temp files
-      const imageStreams = imagesBase64.map((base64, index) => {
-        const cleanedBase64 = base64.replace(
-          /^data:image\/\w+;base64,/,
-          '',
-        );
-
-        const imageBuffer = Buffer.from(
-          cleanedBase64,
-          'base64',
-        );
-
-        const tempPath = path.join(
-          process.cwd(),
-          `temp-${Date.now()}-${index}.png`,
-        );
-
-        fs.writeFileSync(tempPath, imageBuffer);
-
-        tempFiles.push(tempPath);
-
-        return fs.createReadStream(tempPath);
-      });
+      const imageFiles = await Promise.all(
+        imagesBase64.map(async (base64, index) => {
+          const match = base64.match(/^data:(image\/[\w+]+);base64,/);
+          const mimeType = (match?.[1] ?? 'image/png') as 'image/jpeg' | 'image/png' | 'image/webp';
+          const ext = mimeType.split('/')[1];
+          const cleanedBase64 = base64.replace(/^data:image\/[\w+]+;base64,/, '');
+          const buffer = Buffer.from(cleanedBase64, 'base64');
+          return toFile(buffer, `image-${index}.${ext}`, { type: mimeType });
+        }),
+      );
 
       const openai = apiKey ? new OpenAI({ apiKey }) : this.openai;
 
       // OPENAI REQUEST
       const result = await openai.images.edit({
         model: 'gpt-image-2',
-        image: imageStreams,
+        image: imageFiles,
         prompt,
         size: size as any,
-      });
-
-      // cleanup temp files
-      tempFiles.forEach((file) => {
-        if (fs.existsSync(file)) {
-          fs.unlinkSync(file);
-        }
       });
 
       if (!result.data?.length) {

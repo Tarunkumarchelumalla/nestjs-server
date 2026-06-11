@@ -129,12 +129,14 @@ export class ImageController {
 
 
   @Post('generate')
-  async generate(@Body() body: GenerateImageDto) {
+  async generate(@Body() body: any) {
+    const imagesBase64 = body.imagesBase64 ?? body.images_base64;
+    const rawApiKey = body.apiKey ?? body.encoded_api_key;
     return this.imageService.generateImage(
       body.prompt,
-      body.imagesBase64,
+      imagesBase64,
       body.size,
-      this.resolveApiKey(body.apiKey),
+      this.resolveApiKey(rawApiKey),
     );
   }
 
