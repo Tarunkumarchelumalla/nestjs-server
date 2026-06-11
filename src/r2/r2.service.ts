@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import * as crypto from 'crypto';
 import * as https from 'https';
 
+const GRAPH_VERSION = 'v21.0';
+const MAX_MEDIA_BYTES = 100 * 1024 * 1024; // WhatsApp doc max is 100MB
+
 @Injectable()
 export class R2UploadService {
   private readonly accountId = process.env.R2_ACCOUNT_ID;
@@ -130,20 +133,41 @@ export class R2UploadService {
   }
 
   private resolveExt(mime: string, filename?: string): string {
-    // Try from mime map first
     if (R2UploadService.EXT_MAP[mime]) return R2UploadService.EXT_MAP[mime];
 
-    // Try from original filename
     if (filename) {
       const parts = filename.split('.');
       if (parts.length > 1) return parts.pop()!.toLowerCase();
     }
 
-    // Fallback: grab subtype from mime
     const sub = mime.split('/').pop() || 'bin';
     return sub.includes('+') ? sub.split('+')[0] : sub;
   }
 
+  /** Shared core: sign + PUT a buffer to R2, return public URL */
+  private async uploadBuffer(
+    body: Buffer,
+    mime: string,
+    chatId: string,
+    messageId: string,
+    mediaType: string,
+    filename?: string,
+  ) {
+    const ext = this.resolveExt(mime, filename);
+    const r2Key = `wa-media/${mediaType}/${chatId}/${messageId}.${ext}`;
+
+    const { uploadUrl, headers } = this.buildSignedHeaders(r2Key, body, mime);
+    await this.putToR2(uploadUrl, body, headers);
+
+    return {
+      url: `${this.publicUrl}/${r2Key}`,
+      r2_key: r2Key,
+      mime_type: mime,
+      size_bytes: body.length,
+    };
+  }
+
+  /** Legacy path: base64 arrives from n8n */
   async upload(
     mediaBase64: string,
     mimeType: string,
@@ -153,16 +177,68 @@ export class R2UploadService {
     filename?: string,
   ) {
     const mime = mimeType.split(';')[0];
-    const ext = this.resolveExt(mime, filename);
-    const r2Key = `wa-media/${mediaType}/${chatId}/${messageId}.${ext}`;
     const body = Buffer.from(mediaBase64, 'base64');
+    return this.uploadBuffer(body, mime, chatId, messageId, mediaType, filename);
+  }
 
-    const { uploadUrl, headers } = this.buildSignedHeaders(r2Key, body, mime);
-    await this.putToR2(uploadUrl, body, headers);
+  /**
+   * New path: n8n sends only the WhatsApp media_id + access token.
+   * Service fetches the CDN URL from Meta, downloads the binary,
+   * and uploads it to R2. No base64 ever touches n8n.
+   */
+  async ingestFromWhatsApp(params: {
+    media_id: string;
+    wa_token: string;
+    mime_type?: string;
+    chat_id: string;
+    message_id: string;
+    media_type?: string;
+    filename?: string;
+  }) {
+    const { media_id, wa_token } = params;
+    const authHeaders = { Authorization: `Bearer ${wa_token}` };
 
-    return {
-      url: `${this.publicUrl}/${r2Key}`,
-      r2_key: r2Key,
-    };
+    // 1. Resolve media_id -> short-lived CDN URL (valid ~5 min)
+    const infoRes = await fetch(
+      `https://graph.facebook.com/${GRAPH_VERSION}/${media_id}`,
+      { headers: authHeaders },
+    );
+    if (!infoRes.ok) {
+      throw new Error(
+        `Meta media lookup failed (${infoRes.status}): ${await infoRes.text()}`,
+      );
+    }
+    const info: {
+      url?: string;
+      mime_type?: string;
+      file_size?: number;
+      sha256?: string;
+    } = await infoRes.json();
+
+    if (!info.url) throw new Error('Meta returned no media URL');
+    if (info.file_size && info.file_size > MAX_MEDIA_BYTES) {
+      throw new Error(`Media too large: ${info.file_size} bytes`);
+    }
+
+    // 2. Download the binary (same Bearer token is REQUIRED here too,
+    //    the lookaside URL 403s without it)
+    const fileRes = await fetch(info.url, { headers: authHeaders });
+    if (!fileRes.ok) {
+      throw new Error(`Meta media download failed (${fileRes.status})`);
+    }
+    const body = Buffer.from(await fileRes.arrayBuffer());
+
+    // 3. Upload to R2
+    const mime = (info.mime_type || params.mime_type || 'application/octet-stream')
+      .split(';')[0];
+
+    return this.uploadBuffer(
+      body,
+      mime,
+      params.chat_id,
+      params.message_id,
+      params.media_type || 'media',
+      params.filename,
+    );
   }
 }
