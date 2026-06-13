@@ -148,8 +148,8 @@ export class R2UploadService {
   private async uploadBuffer(
     body: Buffer,
     mime: string,
-    chatId: string,
-    messageId: string,
+    chatId: string=Math.random().toString(36).substring(2, 8),  // fallback random chatId if not provided
+    messageId: string=Math.random().toString(36).substring(2, 8), // fallback random messageId if not provided
     mediaType: string,
     filename?: string,
   ) {
